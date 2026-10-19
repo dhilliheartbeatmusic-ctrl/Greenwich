@@ -8,7 +8,7 @@ Premium website for **Greenwich Global Institute of Hotel Management**, Visakhap
 
 ## Included
 
-- Responsive forest-green, ivory and gold website with the supplied Greenwich logo and GK RAO portrait.
+- Responsive sky-blue, white and warm-gold website with the supplied Greenwich logo and GK RAO portrait.
 - Photo-led course catalogue with filters, course detail dialogs and direct booking requests.
 - Shore and ship career pathways, keyboard-accessible tabs and career enquiry forms.
 - Institute, study areas, learning experience, career directions, leadership, admissions, fee guidance, FAQs and enquiry sections.
@@ -103,3 +103,7 @@ Official deployment references: [Node.js SQLite](https://nodejs.org/download/rel
 The public site now includes the provided Greenwich brand mark, GK RAO as Founder & CTO with the supplied portrait, and LANDA DHILLESWARA RAO as CEO. No CEO portrait was supplied, so that card uses initials. Supporting guide and privacy pages use the same branding.
 
 On Node hosting, requests go into the protected staff dashboard at `/admin.html`. On static hosting, visitors prepare a WhatsApp request and must tap Send themselves. GitHub stores the source; a GitHub push alone does not start the backend or configure a live domain.
+
+### Light colour theme
+
+The public site, course dialogs, admissions form, supporting pages and staff dashboard use a bright sky-blue and white palette. Warm gold and soft coral provide accents. The hero uses a pale overlay with dark blue text; career and contact sections use light surfaces. The supplied logo and original photos are preserved.
