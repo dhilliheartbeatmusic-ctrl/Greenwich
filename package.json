@@ -1,0 +1,14 @@
+{
+  "name": "greenwich-hospitality",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Greenwich Global Institute of Hotel Management, Visakhapatnam",
+  "engines": { "node": ">=24 <25" },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "test": "node --test test/*.test.mjs",
+    "check": "node --check server.mjs && node --check public/app.js && node --check public/admin.js",
+    "build": "node scripts/build.mjs"
+  }
+}
