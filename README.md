@@ -2,18 +2,21 @@
 
 Premium website for **Greenwich Global Institute of Hotel Management**, Visakhapatnam.
 
-- Founder: **KOMARA GANAPATHI RAO**
+- Founder & CTO: **GK RAO**
 - CEO: **LANDA DHILLESWARA RAO**
 - Phone / WhatsApp: **+91 99676 25438**
 
 ## Included
 
-- Responsive forest-green, ivory and gold website with original illustrative hospitality imagery.
+- Responsive forest-green, ivory and gold website with the supplied Greenwich logo and GK RAO portrait.
+- Photo-led course catalogue with filters, course detail dialogs and direct booking requests.
+- Shore and ship career pathways, keyboard-accessible tabs and career enquiry forms.
 - Institute, study areas, learning experience, career directions, leadership, admissions, fee guidance, FAQs and enquiry sections.
 - Accessible navigation, keyboard-operable course dialogs, enquiry validation, call and WhatsApp links.
 - Printable institute guide and privacy notice.
-- Optional Node.js admissions backend with SQLite storage, enquiry references and duplicate-request protection.
-- Password-protected staff dashboard with search, status filters, updates, deletion and CSV export.
+- Optional Node.js backend with SQLite storage, admission enquiries, course booking requests and career enquiries. Each request gets a reference with duplicate protection. Existing databases are migrated without dropping records.
+- Course booking requests capture qualification, preferred month and contact details. Career enquiries capture qualification and Shore / Ship / Either preference. No payment or inventory reservation is implemented.
+- Password-protected staff dashboard with search, status, request-type and career-direction filters, updates, deletion and CSV export including booking fields.
 - Staff editor for course titles, descriptions, topics, duration, eligibility, fees and the announcement.
 - No third-party packages, analytics, remote fonts or external image dependencies.
 
@@ -68,7 +71,7 @@ npm run build
 6. Open `/admin.html`, sign in and complete one test enquiry before launch. Remove your own test record from the staff dashboard.
 7. Back up the SQLite database with a SQLite-aware backup tool or while the server is stopped. Restrict database backups and CSV exports to authorised staff.
 
-Production startup refuses an empty/short password or a missing HTTPS origin. Sessions expire after eight hours and after a restart. This is a single-instance staff dashboard, not a multi-tenant student/parent portal. Use one server instance with its persistent disk; add a managed database and shared sessions before horizontal scaling. No online fee payments are implemented.
+Production startup refuses an empty/short password or a missing HTTPS origin. Sessions expire after eight hours and after a restart. This is a single-instance staff dashboard, not a multi-tenant student/parent portal. Use one server instance with its persistent disk; add a managed database and shared sessions before horizontal scaling. No online fee payments are implemented. A booking is a request pending institute confirmation. There is no seat inventory, automatic allocation or job application to an employer. Staff may mark a request Confirmed after completing the official process. No automated messages are sent.
 
 ### GitHub Pages (static only)
 
@@ -87,10 +90,16 @@ Edit `public/index.html` for leadership, contact and page content. Edit `public/
 
 ## Image asset
 
-`public/assets/hospitality-hero.png` was generated with the built-in image generation tool for this website. It is illustrative and does not show the actual Greenwich campus or students. The reusable generation brief is in `ASSETS.md`. Replace it with approved real photography when available.
+The supplied logo and GK RAO portrait are in `public/assets/greenwich-logo.png` and `public/assets/gk-rao.webp`. Course and career images were created using the built-in image generator and are clearly described as illustrative. They do not depict the actual campus, students, partners or employers. WebP versions are used to reduce loading time. Asset provenance and generation briefs are in `ASSETS.md`.
 
 ## Verification
 
-Automated integration tests cover successful submission, validation, repeat requests, database persistence, authentication, CSRF checks, protected exports, spreadsheet formula neutralisation, status changes, deletion, logout and content editing. Responsive styles are implemented; a full browser visual QA pass is still recommended on the target host.
+Automated integration tests cover successful submission, validation, repeat requests, database persistence, authentication, CSRF checks, protected exports, spreadsheet formula neutralisation, status changes, deletion, logout, content editing, booking validation, career directions, idempotency conflicts and upgrades of existing databases. Responsive styles are implemented for mobile, tablet and desktop. Browser visual QA was unavailable in the authoring environment; check the final domain on Android and desktop before launch.
 
 Official deployment references: [Node.js SQLite](https://nodejs.org/download/release/latest-v24.x/docs/api/sqlite.html), [GitHub Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/creating-a-github-pages-site).
+
+## Premium update
+
+The public site now includes the provided Greenwich brand mark, GK RAO as Founder & CTO with the supplied portrait, and LANDA DHILLESWARA RAO as CEO. No CEO portrait was supplied, so that card uses initials. Supporting guide and privacy pages use the same branding.
+
+On Node hosting, requests go into the protected staff dashboard at `/admin.html`. On static hosting, visitors prepare a WhatsApp request and must tap Send themselves. GitHub stores the source; a GitHub push alone does not start the backend or configure a live domain.

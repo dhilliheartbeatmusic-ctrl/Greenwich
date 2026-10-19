@@ -16,7 +16,7 @@ test('Admissions delivery, persistence, access control and content updates',asyn
   t.after(async()=>{await new Promise(resolve=>server.close(resolve));await rm(directory,{recursive:true,force:true});});
   let content;
   await t.test('Public website and data available; source and database are private',async()=>{
-    const page=await call('/');assert.equal(page.status,200);assert.match(await page.text(),/KOMARA(?:<br>|\s)+GANAPATHI RAO/);assert.match(page.headers.get('content-security-policy'),/frame-ancestors 'none'/);
+    const page=await call('/');assert.equal(page.status,200);assert.match(await page.text(),/GK RAO/);assert.match(page.headers.get('content-security-policy'),/frame-ancestors 'none'/);
     const api=await call('/api/public-content');assert.equal(api.status,200);const data=await api.json();assert.equal(data.service,'greenwich-admissions');content=data.content;
     assert.equal((await call('/server.mjs')).status,404);assert.equal((await call('/data/greenwich.sqlite')).status,404);assert.equal((await call('/.env')).status,404);
     assert.equal((await call('/api/admin/enquiries')).status,401);assert.equal((await call('/api/admin/export')).status,401);

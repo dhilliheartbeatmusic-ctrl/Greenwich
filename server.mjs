@@ -2,13 +2,15 @@ import http from 'node:http';
 import {readFile, stat, mkdir} from 'node:fs/promises';
 import {resolve, extname, dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {randomBytes, randomUUID, scryptSync, timingSafeEqual} from 'node:crypto';
+import {randomBytes, randomUUID, scryptSync, timingSafeEqual, createHash} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
 import vm from 'node:vm';
 
 const ROOT=dirname(fileURLToPath(import.meta.url));
 const TYPES={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.ico':'image/x-icon','.txt':'text/plain; charset=utf-8'};
-const STATUSES=['New','Contacted','Follow-up','Closed'];
+const STATUSES=['New','Contacted','Follow-up','Confirmed','Closed'];
+const REQUEST_KINDS=['enquiry','booking','career'];
+const QUALIFICATIONS=['10th completed','12th completed','Diploma','Graduate','Postgraduate','Currently studying','Other'];
 const MAX_BODY=24*1024;
 function clean(value,max){return typeof value==='string'?value.trim().slice(0,max):'';}
 function fail(status,message){const e=new Error(message);e.status=status;throw e;}
@@ -34,6 +36,11 @@ export async function createApp(options={}){
     status TEXT NOT NULL DEFAULT 'New', created_at TEXT NOT NULL,
     consent_at TEXT NOT NULL, consent_version TEXT NOT NULL DEFAULT '1'
   ); CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);`);
+  // Additive migration preserves enquiries from the original admissions website.
+  const columns=new Set(db.prepare('PRAGMA table_info(enquiries)').all().map(column=>column.name));
+  for(const [name,definition] of Object.entries({request_kind:"TEXT NOT NULL DEFAULT 'enquiry'",email:"TEXT NOT NULL DEFAULT ''",qualification:"TEXT NOT NULL DEFAULT ''",career_track:"TEXT NOT NULL DEFAULT ''",preferred_month:"TEXT NOT NULL DEFAULT ''",request_hash:"TEXT NOT NULL DEFAULT ''"})){
+    if(!columns.has(name))db.exec(`ALTER TABLE enquiries ADD COLUMN ${name} ${definition}`);
+  }
   const sandbox={window:{}};vm.runInNewContext(await readFile(resolve(ROOT,'public/site-data.js'),'utf8'),sandbox);
   const defaultContent=JSON.parse(JSON.stringify(sandbox.window.GREENWICH_CONTENT));
   const getContent=()=>{const r=db.prepare('SELECT value FROM settings WHERE key=?').get('content');return r?JSON.parse(r.value):defaultContent;};
@@ -66,7 +73,7 @@ export async function createApp(options={}){
           if(production&&!requestOrigin)fail(403,'An origin is required.');
           if(req.headers['sec-fetch-site']==='cross-site')fail(403,'Cross-site request rejected.');
         }
-        if(path==='/api/public-content'&&req.method==='GET')return json(res,200,{service:'greenwich-admissions',content:getContent()});
+        if(path==='/api/public-content'&&req.method==='GET')return json(res,200,{service:'greenwich-admissions',requestTypes:true,content:getContent()});
         if(path==='/api/enquiries'&&req.method==='POST'){
           limited('enquiry:'+ip,8,15*60000);
           const body=await readBody(req);
@@ -75,10 +82,26 @@ export async function createApp(options={}){
           const digits=phone.replace(/\D/g,'');
           if(name.length<2||!/^[-+() 0-9]+$/.test(phone)||digits.length<10||digits.length>15||!interest||body.consent!==true||key.length<10)fail(400,'Enter a valid name, mobile, interest and consent.');
           if(![...getContent().programs.map(p=>p.title),'Help me choose'].includes(interest))fail(400,'Select a valid area of interest.');
-          const existing=db.prepare('SELECT id FROM enquiries WHERE request_key=?').get(key);
-          if(existing)return json(res,200,{reference:existing.id});
-          const reference='GGI-'+randomUUID().slice(0,8).toUpperCase(),now=new Date().toISOString();
-          db.prepare('INSERT INTO enquiries (id,request_key,name,phone,interest,message,created_at,consent_at) VALUES (?,?,?,?,?,?,?,?)').run(reference,key,name,phone,interest,message,now,now);
+          const kind=body.requestKind===undefined?'enquiry':body.requestKind;
+          const email=clean(body.email,254),qualification=clean(body.qualification,80),track=clean(body.careerTrack,30),month=clean(body.preferredMonth,7);
+          if(!REQUEST_KINDS.includes(kind))fail(400,'Choose a valid request type.');
+          if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))fail(400,'Enter a valid email address.');
+          if(qualification&&!QUALIFICATIONS.includes(qualification))fail(400,'Select a valid qualification.');
+          if(track&&!['Shore','Ship','Either'].includes(track))fail(400,'Select Shore, Ship or Either.');
+          if((kind==='booking'||kind==='career')&&!qualification)fail(400,'Select your highest qualification.');
+          if(kind==='career'&&!track)fail(400,'Select your preferred career direction.');
+          const currentMonth=new Date(Date.now()+330*60000).toISOString().slice(0,7);
+          if(kind==='booking'&&(interest==='Help me choose'||!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)||month<currentMonth||body.preferredMonth!==month))fail(400,'Choose a course and a current or future start month.');
+          const preferredMonth=kind==='booking'?month:'';
+          const requestHash=createHash('sha256').update(JSON.stringify({name,phone,interest,message,kind,email,qualification,track,preferredMonth})).digest('hex');
+          const existing=db.prepare('SELECT id,request_hash FROM enquiries WHERE request_key=?').get(key);
+          if(existing){
+            if(existing.request_hash&&existing.request_hash!==requestHash)fail(409,'This request reference belongs to different details. Please start a new request.');
+            return json(res,200,{reference:existing.id});
+          }
+          const prefix=kind==='booking'?'GGB':kind==='career'?'GGC':'GGI';
+          const reference=prefix+'-'+randomUUID().toUpperCase(),now=new Date().toISOString();
+          db.prepare('INSERT INTO enquiries (id,request_key,name,phone,interest,message,created_at,consent_at,request_kind,email,qualification,career_track,preferred_month,request_hash) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(reference,key,name,phone,interest,message,now,now,kind,email,qualification,track,preferredMonth,requestHash);
           return json(res,201,{reference});
         }
         if(path==='/api/admin/login'&&req.method==='POST'){
@@ -96,11 +119,11 @@ export async function createApp(options={}){
           if(path==='/api/admin/session'&&req.method==='GET')return json(res,200,{csrf:current.csrf});
           if(path==='/api/admin/logout'&&req.method==='POST'){sessions.delete(current.token);res.setHeader('Set-Cookie',`greenwich_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${production?'; Secure':''}`);return json(res,200,{ok:true});}
           if(path==='/api/admin/enquiries'&&req.method==='GET'){
-            const rows=db.prepare('SELECT id,name,phone,interest,message,status,created_at FROM enquiries ORDER BY created_at DESC LIMIT 1000').all();return json(res,200,{enquiries:rows});
+            const rows=db.prepare('SELECT id,name,phone,interest,message,status,created_at,request_kind,email,qualification,career_track,preferred_month FROM enquiries ORDER BY created_at DESC LIMIT 1000').all();return json(res,200,{enquiries:rows});
           }
           if(path==='/api/admin/export'&&req.method==='GET'){
-            const rows=db.prepare('SELECT id,name,phone,interest,message,status,created_at FROM enquiries ORDER BY created_at DESC').all();
-            const csv=['Reference,Name,Phone,Interest,Message,Status,Created at',...rows.map(r=>Object.values(r).map(csvCell).join(','))].join('\r\n');
+            const rows=db.prepare('SELECT id,name,phone,interest,message,status,created_at,request_kind,email,qualification,career_track,preferred_month FROM enquiries ORDER BY created_at DESC').all();
+            const csv=['Reference,Name,Phone,Interest,Message,Status,Created at,Request type,Email,Qualification,Career direction,Preferred start month',...rows.map(r=>Object.values(r).map(csvCell).join(','))].join('\r\n');
             res.writeHead(200,{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="Greenwich_Enquiries.csv"','Cache-Control':'no-store'});return res.end('\uFEFF'+csv);
           }
           if(path.startsWith('/api/admin/enquiries/')&&req.method==='PATCH'){
